@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image/color"
 	"math"
 	"math/rand"
 
@@ -12,6 +13,7 @@ type Particle struct {
 	previous rl.Vector3
 	accel    rl.Vector3
 	radius   float64
+	color    color.RGBA
 }
 
 func UpdatePositions(verlet_objects []Particle, delta_time float32) {
@@ -25,6 +27,23 @@ func UpdatePositions(verlet_objects []Particle, delta_time float32) {
 			X: 0.0,
 			Y: 0.0,
 			Z: 0.0,
+		}
+	}
+}
+
+func Magnet(particles []Particle, activeM bool) {
+	if !activeM {
+		return
+	}
+	center := rl.Vector3{X: 0.0, Y: 0.0, Z: 0.0}
+	strength := float32(2000.0)
+	for i := range particles {
+		p := &particles[i]
+		direction := rl.Vector3Subtract(center, p.current)
+		distance := math.Sqrt(float64(rl.Vector3DotProduct(direction, direction)))
+		if distance > 0 {
+			n := rl.Vector3Scale(direction, float32(1.0/distance))
+			p.accel = rl.Vector3Add(p.accel, rl.Vector3Scale(n, strength))
 		}
 	}
 }
@@ -45,7 +64,7 @@ func ApplyForces(verlet_objects []Particle, gravity rl.Vector3) {
 	}
 }
 
-func HandleCollision(a Particle, b Particle) {
+func HandleCollision(a *Particle, b *Particle) {
 	axis := rl.Vector3Subtract(a.current, b.current)
 	distance := math.Sqrt(float64(rl.Vector3DotProduct(axis, axis)))
 	if distance == 0 {
@@ -60,16 +79,17 @@ func HandleCollision(a Particle, b Particle) {
 	}
 }
 
+func BruteForceCollision(verlet_objects []Particle) {
+	for i := range verlet_objects {
+		for j := range verlet_objects {
+			a := &verlet_objects[i]
+			b := &verlet_objects[j]
+			HandleCollision(a, b)
+		}
+	}
+}
+
 func ApplyConstraints(radius float64, verlet_objects []Particle) {
-	// Floor constraint
-	// for i := range verlet_objects {
-	// 	p := &verlet_objects[i]
-	// 	if p.current.Y <= -2 {
-	// 		displacement := p.current.Y - p.previous.Y
-	// 		p.current.Y = -2
-	// 		p.previous.Y = p.current.Y + displacement
-	// 	}
-	// }
 	for i := range verlet_objects {
 		p := &verlet_objects[i]
 		container_pos := rl.Vector3{
@@ -116,10 +136,19 @@ func main() {
 	rl.InitWindow(1280, 800, "3D Particle Simulation Inside a Sphere")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
-
-	particles := make([]Particle, 20)
+	magnetActive := false
+	particles := make([]Particle, 500)
 	sphereRadius := 15.0
+	colors := []color.RGBA{
+		rl.NewColor(255, 182, 193, 255), // Light Pink
+		rl.NewColor(173, 216, 230, 255), // Light Blue
+		rl.NewColor(240, 230, 140, 255), // Light Khaki
+		rl.NewColor(152, 251, 152, 255), // Pale Green
+		rl.NewColor(221, 160, 221, 255), // Plum
+	}
+
 	for i := range particles {
+		randColor := colors[rand.Intn(len(colors))]
 		random_position := RandomPointInSphere(float32(sphereRadius))
 		particles[i] = Particle{
 			current:  random_position,
@@ -130,6 +159,7 @@ func main() {
 				Z: 0.0,
 			},
 			radius: 0.3,
+			color:  randColor,
 		}
 	}
 
@@ -140,29 +170,36 @@ func main() {
 		Fovy:       45.0,
 		Projection: rl.CameraPerspective,
 	}
-
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
 		rl.BeginMode3D(camera)
-
+		if rl.IsKeyPressed(rl.KeySpace) {
+			magnetActive = !magnetActive
+		}
+		for _, p := range particles {
+			rl.DrawSphere(p.current, float32(p.radius), p.color)
+		}
 		rl.DrawSphereWires(rl.Vector3{
 			X: 0.0,
 			Y: 0.0,
 			Z: 0.0,
 		}, float32(sphereRadius), 16, 26, rl.DarkGray)
 
-		for _, p := range particles {
-			rl.DrawSphere(p.current, float32(p.radius), rl.Beige)
-		}
 		sub_dt := float32(time_step) / float32(sub_steps)
-
+		Magnet(particles, magnetActive)
 		ApplyForces(particles, gravity)
 		UpdatePositions(particles, sub_dt)
-		HandleCollision()
+		BruteForceCollision(particles)
 		ApplyConstraints(sphereRadius, particles)
 
 		rl.EndMode3D()
+		if magnetActive {
+			rl.DrawText("Magnet: ON", 10, 10, 20, rl.Green)
+		} else {
+			rl.DrawText("Magnet: OFF (Press SPACE to toggle)", 10, 10, 20, rl.Red)
+		}
+
 		rl.EndDrawing()
 	}
 }

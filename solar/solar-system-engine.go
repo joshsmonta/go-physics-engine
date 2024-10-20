@@ -1,0 +1,5 @@
+package solar
+
+func Run() {
+
+}

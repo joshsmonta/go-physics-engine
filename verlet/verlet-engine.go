@@ -1,6 +1,7 @@
 package verlet
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"math/rand"
@@ -21,8 +22,7 @@ func UpdatePositions(verlet_objects []Particle, delta_time float32) {
 		p := &verlet_objects[i]
 		displacement := rl.Vector3Subtract(p.current, p.previous)
 		p.previous = p.current
-		p.current = rl.Vector3Add(rl.Vector3Add(p.current, displacement),
-			rl.Vector3Scale(p.accel, delta_time*delta_time))
+		p.current = rl.Vector3Add(rl.Vector3Add(p.current, displacement), rl.Vector3Scale(p.accel, delta_time*delta_time))
 		p.accel = rl.Vector3{
 			X: 0.0,
 			Y: 0.0,
@@ -58,7 +58,7 @@ func ApplyForces(verlet_objects []Particle, gravity rl.Vector3) {
 			// Normalize the displacement vector
 			n := rl.Vector3Scale(displacement, float32(1.0/distance))
 			// Apply friction: accel += n * friction
-			frictionForce := rl.Vector3Scale(n, float32(-100))
+			frictionForce := rl.Vector3Scale(n, float32(-200))
 			p.accel = rl.Vector3Add(p.accel, frictionForce)
 		}
 	}
@@ -125,6 +125,8 @@ func RandomPointInSphere(radius float32) rl.Vector3 {
 }
 
 func Run() {
+	// var wg sync.WaitGroup
+
 	gravity := rl.Vector3{
 		X: 0.0,
 		Y: -1000.0,
@@ -157,7 +159,7 @@ func Run() {
 				Y: 0.0,
 				Z: 0.0,
 			},
-			radius: 0.3,
+			radius: 0.5,
 			color:  randColor,
 		}
 	}
@@ -183,7 +185,7 @@ func Run() {
 			X: 0.0,
 			Y: 0.0,
 			Z: 0.0,
-		}, float32(sphereRadius), 16, 26, rl.DarkGray)
+		}, float32(sphereRadius), 16, 16, rl.DarkGray)
 
 		sub_dt := float32(time_step) / float32(sub_steps)
 		Magnet(particles, magnetActive)
@@ -192,7 +194,9 @@ func Run() {
 		BruteForceCollision(particles)
 		ApplyConstraints(sphereRadius, particles)
 
+		str := fmt.Sprintf("%.10f", sub_dt)
 		rl.EndMode3D()
+		rl.DrawText("SubSteps: "+str, 10, 35, 20, rl.RayWhite)
 		if magnetActive {
 			rl.DrawText("Magnet: ON", 10, 10, 20, rl.Green)
 		} else {

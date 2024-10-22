@@ -12,31 +12,27 @@ type Particle struct {
 	radius   float32
 }
 
-// type Box struct {
-// 	width  float32
-// 	length float32
-// }
+type Box struct {
+	width  float32
+	length float32
+}
 
-func UpdateBallPosition(particle Particle, delta float32) {
-	p := &particle
+func UpdateBallPosition(p *Particle, delta float32) {
+	// p := &particle
 	p.velocity = rl.Vector2Add(p.velocity, rl.Vector2Scale(p.accel, delta))
 	p.current = rl.Vector2Add(p.current, rl.Vector2Scale(p.velocity, delta))
 }
 
-// func HandleBoxCollision(particle Particle, box Box) {
-// 	p := &particle
-// 	box_pos := rl.Vector2{
-// 		X: float32(box.width),
-// 		Y: float32(box.length),
-// 	}
-// 	displacement := rl.Vector2Subtract(p.current, box_pos)
-// 	distance := rl.Vector2Length(displacement)
-// 	if distance < p.radius {
-// 		n := rl.Vector2Scale(displacement, 1.0/distance)
-// 		p.accel = rl.Vector2Add(p.accel, rl.Vector2Scale(n, p.radius-distance))
-// 	}
-
-// }
+func HandleBoxCollision(p *Particle, box *Box) {
+	ball_bottom := p.current.Y + p.radius
+	ball_sides := p.current.X + p.radius
+	if box.length <= ball_bottom {
+		p.velocity.Y = -p.velocity.Y
+	}
+	if box.width <= ball_sides {
+		p.velocity.X = -p.velocity.X
+	}
+}
 
 func Run() {
 	width := 1280
@@ -51,18 +47,18 @@ func Run() {
 		accel:    rl.Vector2{X: 0.0, Y: 20.0},
 		radius:   15,
 	}
-	// box := Box{
-	// 	width:  float32(width),
-	// 	length: float32(length),
-	// }
+	box := Box{
+		width:  float32(width),
+		length: float32(length),
+	}
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
 
 		rl.DrawCircle(int32(particle.current.X), int32(particle.current.Y), particle.radius, rl.Red)
-		UpdateBallPosition(particle, 1.0/60.0)
-		// HandleBoxCollision(particle, box)
+		UpdateBallPosition(&particle, 1.0/60.0)
+		HandleBoxCollision(&particle, &box)
 
 		rl.EndDrawing()
 	}

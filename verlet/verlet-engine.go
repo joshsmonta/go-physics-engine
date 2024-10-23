@@ -126,7 +126,6 @@ func RandomPointInSphere(radius float32) rl.Vector3 {
 
 func Run() {
 	// var wg sync.WaitGroup
-
 	gravity := rl.Vector3{
 		X: 0.0,
 		Y: -1000.0,
@@ -202,7 +201,6 @@ func Run() {
 		} else {
 			rl.DrawText("Magnet: OFF (Press SPACE to toggle)", 10, 10, 20, rl.Red)
 		}
-
 		rl.EndDrawing()
 	}
 }

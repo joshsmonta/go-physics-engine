@@ -146,7 +146,6 @@ func Run() {
 		rl.NewColor(152, 251, 152, 255), // Pale Green
 		rl.NewColor(221, 160, 221, 255), // Plum
 	}
-
 	for i := range particles {
 		randColor := colors[rand.Intn(len(colors))]
 		random_position := RandomPointInSphere(float32(sphereRadius))
@@ -193,7 +192,7 @@ func Run() {
 		BruteForceCollision(particles)
 		ApplyConstraints(sphereRadius, particles)
 
-		str := fmt.Sprintf("%.10f", sub_dt)
+		str := fmt.Sprintf("%.10f", sub_dt*sub_dt)
 		rl.EndMode3D()
 		rl.DrawText("SubSteps: "+str, 10, 35, 20, rl.RayWhite)
 		if magnetActive {

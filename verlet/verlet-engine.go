@@ -1,7 +1,6 @@
 package verlet
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 	"math/rand"
@@ -192,9 +191,8 @@ func Run() {
 		BruteForceCollision(particles)
 		ApplyConstraints(sphereRadius, particles)
 
-		str := fmt.Sprintf("%.10f", sub_dt*sub_dt)
 		rl.EndMode3D()
-		rl.DrawText("SubSteps: "+str, 10, 35, 20, rl.RayWhite)
+		// rl.DrawText("SubSteps: "+str, 10, 35, 20, rl.RayWhite)
 		if magnetActive {
 			rl.DrawText("Magnet: ON", 10, 10, 20, rl.Green)
 		} else {

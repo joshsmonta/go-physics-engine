@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"math/rand"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -112,9 +113,9 @@ func (g *Grid) AddObject(p *Particle) {
 	cellSize := 2.0 * p.radius
 	halfGrid := float32(g.cellNum) / 2.0
 
-	ix := int(math.Floor(float64(p.current.X/cellSize + halfGrid)))
-	iy := int(math.Floor(float64(p.current.Y/cellSize + halfGrid)))
-	iz := int(math.Floor(float64(p.current.Z/cellSize + halfGrid)))
+	ix := int(float64(p.current.X/cellSize + halfGrid))
+	iy := int(float64(p.current.Y/cellSize + halfGrid))
+	iz := int(float64(p.current.Z/cellSize + halfGrid))
 
 	if ix < 0 || ix >= g.cellNum ||
 		iy < 0 || iy >= g.cellNum ||
@@ -132,29 +133,29 @@ func (g *Grid) AddObject(p *Particle) {
 
 // Process collisions using the grid
 func (g *Grid) ApplyCollisions() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	var wg sync.WaitGroup
-	wg.Add(THREAD_COUNT)
-
 	// Process grid in parallel strips along X-axis
-	for t := 0; t < THREAD_COUNT; t++ {
+	for t := range runtime.NumCPU() {
+		wg.Add(1)
 		go func(threadID int) {
 			defer wg.Done()
-			start := threadID * (g.cellNum / THREAD_COUNT)
-			end := (threadID + 1) * (g.cellNum / THREAD_COUNT)
-			if threadID == THREAD_COUNT-1 {
+			start := threadID * (g.cellNum / runtime.NumCPU())
+			end := (threadID + 1) * (g.cellNum / runtime.NumCPU())
+			if threadID == runtime.NumCPU()-1 {
 				end = g.cellNum
 			}
 
 			for x := start; x < end; x++ {
-				for y := 0; y < g.cellNum; y++ {
-					for z := 0; z < g.cellNum; z++ {
+				for y := range g.cellNum {
+					for z := range g.cellNum {
 						currentCell := g.cells[x][y][z]
 						if len(currentCell) == 0 {
 							continue
 						}
 
 						// Check collisions with objects in current cell
-						for a := 0; a < len(currentCell); a++ {
+						for a := range currentCell {
 							for b := a + 1; b < len(currentCell); b++ {
 								handleCollision(currentCell[a], currentCell[b])
 							}
@@ -209,7 +210,7 @@ func handleCollision(a *Particle, b *Particle) {
 }
 
 func BruteForceCollision(verlet_objects []Particle) {
-	for i := 0; i < len(verlet_objects); i++ {
+	for i := range verlet_objects {
 		for j := i + 1; j < len(verlet_objects); j++ {
 			a := &verlet_objects[i]
 			b := &verlet_objects[j]
@@ -268,7 +269,7 @@ func Run() {
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(120)
 	magnetActive := false
-	particles := make([]Particle, 1000)
+	particles := make([]Particle, 500)
 	sphereRadius := 18.0
 	colors := []color.RGBA{
 		rl.NewColor(255, 182, 193, 255), // Light Pink

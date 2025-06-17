@@ -1,26 +1,64 @@
 package ballbox
 
 import (
-	"math/rand"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 const (
 	GRAVITY          = 90.81 // Earth gravity in m/s²
-	BOUNCE_DAMPENING = 0.7   // Energy retained after bounce
+	BOUNCE_DAMPENING = 0.95  // Energy retained after bounce
 	AIR_RESISTANCE   = 0.99  // Air friction coefficient
 	GROUND_FRICTION  = 0.85  // Ground friction coefficient
 )
 
 type Particle struct {
-	position   rl.Vector2
-	velocity   rl.Vector2
-	accel      rl.Vector2
-	radius     float32
-	mass       float32
-	color      rl.Color
-	elasticity float32 // Bounciness factor (0-1)
+	position rl.Vector2
+	velocity rl.Vector2
+	radius   float32
+	mass     float32
+}
+
+// func (p *Particle) Accelerate(x float32, y float32, delta float32) {
+// 	p.velocity.X += x * delta
+// 	p.velocity.Y += y * delta
+// }
+
+// func (p *Particle) UpdatePos(delta float32) {
+// 	p.position.X = p.velocity.X * delta
+// 	p.position.Y = p.velocity.Y * delta
+// }
+
+func (p *Particle) Update(delta float32, width, height float32) {
+	// Apply gravity (converted to pixel/s² scale)
+	p.velocity.Y += GRAVITY * delta
+
+	// Apply air resistance
+	// p.velocity.X *= AIR_RESISTANCE
+	// p.velocity.Y *= AIR_RESISTANCE
+
+	// Update position using velocity
+	p.position.X += p.velocity.X * delta
+	p.position.Y += p.velocity.Y * delta
+
+	// Handle collisions with screen edges
+	// Bottom collision
+	if p.position.Y > height-p.radius {
+		p.position.Y = height - p.radius
+		p.velocity.Y *= -BOUNCE_DAMPENING
+	}
+	// Top collision
+	if p.position.Y < p.radius {
+		p.position.Y = p.radius
+		p.velocity.Y *= -BOUNCE_DAMPENING
+	}
+	// Right/left collisions
+	if p.position.X > width-p.radius {
+		p.position.X = width - p.radius
+		p.velocity.X *= -BOUNCE_DAMPENING
+	} else if p.position.X < p.radius {
+		p.position.X = p.radius
+		p.velocity.X *= -BOUNCE_DAMPENING
+	}
 }
 
 type Box struct {
@@ -28,137 +66,67 @@ type Box struct {
 	height float32
 }
 
-func NewParticle(pos rl.Vector2, radius, mass float32, color rl.Color) *Particle {
-	return &Particle{
-		position:   pos,
-		velocity:   rl.Vector2Zero(),
-		accel:      rl.Vector2{X: 0, Y: GRAVITY},
-		radius:     radius,
-		mass:       mass,
-		color:      color,
-		elasticity: 0.8 + rand.Float32()*0.2, // Random bounciness between 0.8-1.0
-	}
-}
+// func UpdatePhysics(p *Particle, delta float32) {
+// 	// Apply forces (gravity scaled by mass)
+// 	force := rl.Vector2Scale(p.accel, p.mass)
 
-func UpdatePhysics(p *Particle, delta float32) {
-	// Apply forces (gravity scaled by mass)
-	force := rl.Vector2Scale(p.accel, p.mass)
+// 	// Calculate acceleration (F = ma => a = F/m)
+// 	acceleration := rl.Vector2Scale(force, 1/p.mass)
 
-	// Calculate acceleration (F = ma => a = F/m)
-	acceleration := rl.Vector2Scale(force, 1/p.mass)
+// 	// Update velocity with acceleration
+// 	p.velocity.X += acceleration.X * delta
+// 	p.velocity.Y += acceleration.Y * delta
 
-	// Update velocity with acceleration
-	p.velocity.X += acceleration.X * delta
-	p.velocity.Y += acceleration.Y * delta
+// 	// Apply air resistance
+// 	p.velocity = rl.Vector2Scale(p.velocity, AIR_RESISTANCE)
 
-	// Apply air resistance
-	p.velocity = rl.Vector2Scale(p.velocity, AIR_RESISTANCE)
-
-	// Update position (Verlet integration would be better for more accuracy)
-	p.position.X += p.velocity.X * delta
-	p.position.Y += p.velocity.Y * delta
-}
-
-func HandleCollision(p *Particle, box *Box) {
-	// Bottom collision (floor)
-	if p.position.Y+p.radius > box.height {
-		p.position.Y = box.height - p.radius
-		p.velocity.Y = -p.velocity.Y * p.elasticity
-		p.velocity.X *= GROUND_FRICTION // More friction when on ground
-	}
-
-	// Top collision (ceiling)
-	if p.position.Y-p.radius < 0 {
-		p.position.Y = p.radius
-		p.velocity.Y = -p.velocity.Y * p.elasticity
-	}
-
-	// Right collision
-	if p.position.X+p.radius > box.width {
-		p.position.X = box.width - p.radius
-		p.velocity.X = -p.velocity.X * p.elasticity
-	}
-
-	// Left collision
-	if p.position.X-p.radius < 0 {
-		p.position.X = p.radius
-		p.velocity.X = -p.velocity.X * p.elasticity
-	}
-}
+// 	// Update position (Verlet integration would be better for more accuracy)
+// 	p.position.X += p.velocity.X * delta
+// 	p.position.Y += p.velocity.Y * delta
+// }
 
 func Run() {
-	screenWidth := int32(1280)
-	screenHeight := int32(800)
+	screenWidth := float32(1280)
+	screenHeight := float32(800)
 
-	rl.InitWindow(screenWidth, screenHeight, "2D Physics with Mass")
+	rl.InitWindow(1280, 800, "2D Physics with Mass")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(120)
+	rl.SetTargetFPS(60)
 
+	balls := make([]Particle, 2)
 	// Create balls with different masses
-	balls := []*Particle{
-		NewParticle(
-			rl.Vector2{X: float32(screenWidth) / 4, Y: float32(screenHeight) / 4},
-			25.0, 500.0, rl.Red), // Heavy ball (mass=5)
-		NewParticle(
-			rl.Vector2{X: float32(screenWidth) / 2, Y: float32(screenHeight) / 4},
-			15.0, 100.0, rl.Blue), // Medium ball (mass=1)
-		NewParticle(
-			rl.Vector2{X: float32(screenWidth) * 3 / 4, Y: float32(screenHeight) / 4},
-			10.0, 50.0, rl.Green), // Light ball (mass=0.3)
-	}
-
-	// Give initial velocities
-	balls[0].velocity.X = 100.0
-	balls[1].velocity.X = 100.0
-	balls[2].velocity.X = 100.0
-
-	box := Box{
-		width:  float32(screenWidth),
-		height: float32(screenHeight),
+	for i := range balls {
+		balls[i] = Particle{
+			position: rl.Vector2{X: 200.0, Y: 100.0}, // Start near top
+			velocity: rl.Vector2{X: float32(100 + i*50), Y: 0.0},
+			radius:   15.0,
+			mass:     15.0,
+		}
 	}
 
 	for !rl.WindowShouldClose() {
-		delta := rl.GetFrameTime() // Get actual frame delta time
-
-		// Handle input
-		if rl.IsKeyPressed(rl.KeyR) {
-			// Reset balls
-			balls[0].position = rl.Vector2{X: float32(screenWidth) / 4, Y: float32(screenHeight) / 4}
-			balls[1].position = rl.Vector2{X: float32(screenWidth) / 2, Y: float32(screenHeight) / 4}
-			balls[2].position = rl.Vector2{X: float32(screenWidth) * 3 / 4, Y: float32(screenHeight) / 4}
-
-			balls[0].velocity = rl.Vector2{X: 100, Y: 0}
-			balls[1].velocity = rl.Vector2{X: 100, Y: 0}
-			balls[2].velocity = rl.Vector2{X: 100, Y: 0}
+		delta := rl.GetFrameTime() // Get delta time
+		for i := range balls {
+			balls[i].Update(delta, screenWidth, screenHeight)
+			// balls[i].Accelerate(0, -9.81, delta)
+			// balls[i].UpdatePos(delta)
+			// if balls[i].position.Y < 0 || balls[i].position.Y > screenHeight {
+			// 	balls[i].velocity.Y *= -0.95
+			// }
+			// if balls[i].position.X < 0 || balls[i].position.X > screenWidth {
+			// 	balls[i].velocity.X *= -0.95
+			// }
 		}
-
-		// Update physics for all balls
-		for _, ball := range balls {
-			UpdatePhysics(ball, delta)
-			HandleCollision(ball, &box)
-		}
-
 		// Draw
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
+		// delta := rl.GetFrameTime() // Get actual frame delta time
 
-		// Draw all balls
 		for _, ball := range balls {
-			rl.DrawCircleV(ball.position, ball.radius, ball.color)
-
-			// Draw velocity vector
-			rl.DrawLineV(
-				ball.position,
-				rl.Vector2Add(ball.position, rl.Vector2Scale(ball.velocity, 0.1)),
-				rl.Fade(rl.White, 0.5),
-			)
+			rl.DrawCircleV(ball.position, ball.radius, rl.White)
 		}
 
-		// Draw stats
-		rl.DrawText("Physics with Mass Demonstration", 10, 10, 20, rl.White)
-		rl.DrawText("Red: Heavy (5kg) | Blue: Medium (1kg) | Green: Light (0.3kg)", 10, 30, 20, rl.White)
-		rl.DrawText("Press R to reset balls", 10, 50, 20, rl.White)
-
+		// Update physics for all balls
 		rl.EndDrawing()
 	}
 }

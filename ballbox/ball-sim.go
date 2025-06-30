@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	GRAVITY          = 8000 // Earth gravity in m/s²
-	BOUNCE_DAMPENING = 0.95 // Energy retained after bounce
-	AIR_RESISTANCE   = 0.99 // Air friction coefficient
-	GROUND_FRICTION  = 0.85 // Ground friction coefficient
+	GRAVITY          = 1000.0 // Scaled gravitational constant
+	BOUNCE_DAMPENING = 0.95   // Energy retained after bounce
+	AIR_RESISTANCE   = 0.999  // Minimal air resistance
+	GROUND_FRICTION  = 0.85   // Ground friction coefficient
 )
 
 type Particle struct {
@@ -18,39 +18,24 @@ type Particle struct {
 	velocity rl.Vector2
 	radius   float32
 	mass     float32
+	color    rl.Color
 }
 
-func (p *Particle) Accelerate(x float32, y float32, delta float32) {
-	// Update position using velocity
-	p.position.X += (p.velocity.X + x) * delta
-	p.position.Y += (p.velocity.Y + y) * delta
-}
-
-// func (p *Particle) UpdatePos(delta float32) {
-// 	p.position.X = p.velocity.X * delta
-// 	p.position.Y = p.velocity.Y * delta
-// }
-
+// Update handles wall collisions
 func (p *Particle) Update(delta float32, width, height float32) {
-	// Apply gravity (converted to pixel/s² scale)
-	// p.velocity.Y += GRAVITY * delta
-
-	// Apply air resistance
+	// Apply minimal air resistance
 	// p.velocity.X *= AIR_RESISTANCE
 	// p.velocity.Y *= AIR_RESISTANCE
 
 	// Handle collisions with screen edges
-	// Bottom collision
 	if p.position.Y > height-p.radius {
 		p.position.Y = height - p.radius
 		p.velocity.Y *= -BOUNCE_DAMPENING
 	}
-	// Top collision
 	if p.position.Y < p.radius {
 		p.position.Y = p.radius
 		p.velocity.Y *= -BOUNCE_DAMPENING
 	}
-	// Right/left collisions
 	if p.position.X > width-p.radius {
 		p.position.X = width - p.radius
 		p.velocity.X *= -BOUNCE_DAMPENING
@@ -70,37 +55,29 @@ func (p *Particle) CollidesWith(other *Particle) bool {
 
 // Resolve collision between two particles
 func resolveCollision(p1, p2 *Particle) {
-	// Calculate collision normal (direction from p1 to p2)
 	dx := p2.position.X - p1.position.X
 	dy := p2.position.Y - p1.position.Y
 	distance := float32(math.Sqrt(float64(dx*dx + dy*dy)))
 
-	// Avoid division by zero
 	if distance == 0 {
 		return
 	}
 
-	// Normalize the direction vector
 	nx := dx / distance
 	ny := dy / distance
 
-	// Calculate relative velocity
 	rvx := p2.velocity.X - p1.velocity.X
 	rvy := p2.velocity.Y - p1.velocity.Y
 
-	// Calculate velocity along the normal
 	velocityAlongNormal := rvx*nx + rvy*ny
 
-	// Don't resolve if particles are moving apart
 	if velocityAlongNormal > 0 {
 		return
 	}
 
-	// Calculate impulse scalar
 	impulse := -(1.0 + BOUNCE_DAMPENING) * velocityAlongNormal
 	impulse /= 1/p1.mass + 1/p2.mass
 
-	// Apply impulse
 	impulseX := impulse * nx
 	impulseY := impulse * ny
 
@@ -109,7 +86,6 @@ func resolveCollision(p1, p2 *Particle) {
 	p2.velocity.X += impulseX / p2.mass
 	p2.velocity.Y += impulseY / p2.mass
 
-	// Position correction to prevent sticking
 	overlap := (p1.radius + p2.radius) - distance
 	if overlap > 0 {
 		correctionX := nx * overlap * 0.5
@@ -121,48 +97,45 @@ func resolveCollision(p1, p2 *Particle) {
 	}
 }
 
-type Box struct {
-	width  float32
-	height float32
+func calculateOrbitalVelocity(mass float32) float32 {
+	initialDistance := float32(300.0)
+	orbitalVelocity := float32(math.Sqrt(float64(GRAVITY * mass / (initialDistance))))
+	return orbitalVelocity
 }
 
 func Run() {
 	screenWidth := float32(1280)
 	screenHeight := float32(800)
 
-	rl.InitWindow(1280, 800, "2D Physics with Mass")
+	rl.InitWindow(1280, 800, "Orbiting Moons")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
+	initialDistance := float32(300.0)
+
+	// Masses scaled down by 10^20 for simulation stability
+	// sunMass := float32(1.989e30 / 1e20)   // Mass of the Sun: ~1.989 × 10³⁰ kg
+	// earthMass := float32(5.972e24 / 1e20) // Mass of the Earth: ~5.972 × 10²⁴ kg
+	moonMass := float32(7.35e22 / 1e20)
 
 	balls := make([]Particle, 2)
-	// Create balls with different masses
-	// balls[0] = Particle{
-	// 	position: rl.Vector2{X: 200.0, Y: 100.0}, // Start near top
-	// 	velocity: rl.Vector2{X: float32(100 + 50), Y: 0.0},
-	// 	radius:   15.0,
-	// 	mass:     float32((float64(7.35) * math.Pow(10, 22))),
-	// }
-	// balls[1] = Particle{
-	// 	position: rl.Vector2{X: 800.0, Y: 100.0}, // Start near top
-	// 	velocity: rl.Vector2{X: -float32(100 + 50), Y: 0.0},
-	// 	radius:   15.0,
-	// 	mass:     float32((float64(7.35) * math.Pow(10, 22))),
-	// }
 	balls[0] = Particle{
-		position: rl.Vector2{X: 400, Y: 400},
-		velocity: rl.Vector2{X: 10, Y: 40},
+		position: rl.Vector2{X: screenWidth/2 - initialDistance/2, Y: screenHeight / 2},
+		velocity: rl.Vector2{X: 0, Y: -calculateOrbitalVelocity(moonMass)}, // Initial orbital velocity
 		radius:   30,
-		mass:     1000, // Large mass
+		mass:     moonMass,
+		color:    rl.Yellow,
 	}
 	balls[1] = Particle{
-		position: rl.Vector2{X: 800, Y: 400},
-		velocity: rl.Vector2{X: -10, Y: 50}, // Initial velocity
-		radius:   20,
-		mass:     100, // Smaller mass
+		position: rl.Vector2{X: screenWidth/2 + initialDistance/2, Y: screenHeight / 2},
+		velocity: rl.Vector2{X: 0, Y: calculateOrbitalVelocity(moonMass)}, // Opposite direction
+		radius:   30,
+		mass:     moonMass,
+		color:    rl.SkyBlue,
 	}
 
 	for !rl.WindowShouldClose() {
-		delta := rl.GetFrameTime() // Get delta time
+		subDelta := rl.GetFrameTime()
+		// Apply gravitational forces
 		for i := range balls {
 			for j := range balls {
 				if i == j {
@@ -170,40 +143,46 @@ func Run() {
 				}
 				dx := balls[j].position.X - balls[i].position.X
 				dy := balls[j].position.Y - balls[i].position.Y
-				distance := float32(math.Sqrt(float64(dx*dx + dy*dy)))
-				// Skip if balls are touching
-				if distance < balls[i].radius+balls[j].radius {
+				distanceSq := dx*dx + dy*dy
+				distance := float32(math.Sqrt(float64(distanceSq)))
+
+				if distance == 0 {
 					continue
 				}
-				direction := rl.Vector2{X: dx / distance, Y: dy / distance}
-				distance *= 1000
-				gForce := (GRAVITY * balls[j].mass * balls[i].mass) / (float32(distance) * float32(distance))
-				acc1 := gForce / balls[i].mass
-				acc := rl.Vector2{X: acc1 * direction.X, Y: acc1 * direction.Y}
-				balls[i].Accelerate(acc.X, acc.Y, delta)
-				balls[j].Accelerate(acc.X, acc.Y, delta)
+
+				// Gravitational acceleration (a = F/m = G*M/distance^2)
+				acceleration := GRAVITY * balls[j].mass / distanceSq
+				directionX := dx / distance
+				directionY := dy / distance
+
+				// Update velocity with acceleration
+				balls[i].velocity.X += acceleration * directionX * subDelta
+				balls[i].velocity.Y += acceleration * directionY * subDelta
 			}
-			balls[i].Update(delta, screenWidth, screenHeight)
-			// balls[i].Accelerate(0.0, -9.81, delta)
 		}
+
+		// Update positions
+		for i := range balls {
+			balls[i].position.X += balls[i].velocity.X * subDelta
+			balls[i].position.Y += balls[i].velocity.Y * subDelta
+			balls[i].Update(subDelta, screenWidth, screenHeight)
+		}
+
+		// Check collisions
 		for i := range balls {
 			for j := i + 1; j < len(balls); j++ {
 				if balls[i].CollidesWith(&balls[j]) {
 					resolveCollision(&balls[i], &balls[j])
 				}
-
 			}
 		}
+
 		// Draw
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
-		// delta := rl.GetFrameTime() // Get actual frame delta time
-
 		for _, ball := range balls {
-			rl.DrawCircleV(ball.position, ball.radius, rl.White)
+			rl.DrawCircleV(ball.position, ball.radius, ball.color)
 		}
-
-		// Update physics for all balls
 		rl.EndDrawing()
 	}
 }
